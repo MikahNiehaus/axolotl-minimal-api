@@ -76,6 +76,22 @@ class MinimalGANGenerator:
             
             return buffer.getvalue()
 
+    def generate_grid(self, nrow=3, ncol=3):
+        """Generate a single image that is a grid of generated images"""
+        log(f"Generating {nrow*ncol} images for grid...")
+        self.G.eval()
+        with torch.no_grad():
+            noise = torch.randn(nrow * ncol, self.z_dim, 1, 1, device=self.device)
+            fake = self.G(noise).detach().cpu()
+            from torchvision.utils import make_grid
+            grid = make_grid(fake, nrow=nrow, normalize=True)
+            buffer = io.BytesIO()
+            # Save the grid with normalization
+            save_image(grid, buffer, format="PNG", normalize=True)
+            buffer.seek(0)
+            log("Grid image generated successfully")
+            return buffer.getvalue()
+
 # Initialize the generator once at startup
 generator = MinimalGANGenerator()
 
@@ -90,8 +106,8 @@ def health_check():
 @app.route('/generate', methods=['GET'])
 def generate_image():
     try:
-        log("Received request for image generation")
-        img_bytes = generator.generate_image()
+        log("Received request for image grid generation")
+        img_bytes = generator.generate_grid(nrow=3, ncol=3)
         img_b64 = base64.b64encode(img_bytes).decode("utf-8")
         return jsonify({
             'image': img_b64,
