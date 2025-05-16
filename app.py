@@ -38,7 +38,7 @@ class MinimalGANGenerator:
         
         # Load the model
         self.load_model()
-          def load_model(self):
+    def load_model(self):
         """Load the pre-trained model (full model only)"""
         # Path to full model file
         FULL_MODEL_PATH = os.path.join(DATA_DIR, 'gan_full_model.pth')
