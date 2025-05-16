@@ -19,30 +19,30 @@ IMG_SIZE = 32  # Default image size for the model
 Z_DIM = 100    # Noise vector dimension
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def log(msg):
-    """Simple logging function"""
-    print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {msg}")
+def log(msg, log_list=None):
+    """Simple logging function with optional log collection"""
+    log_entry = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {msg}"
+    print(log_entry)
+    if log_list is not None:
+        log_list.append(log_entry)
 
 class MinimalGANGenerator:
     def __init__(self):
         log(f"Initializing MinimalGANGenerator on device: {DEVICE}")
         from models.gan_modules import Generator
-        
         self.img_size = IMG_SIZE
         self.z_dim = Z_DIM
         self.device = DEVICE
-        
         # Initialize the generator model
         self.G = Generator(z_dim=Z_DIM, img_channels=3, img_size=IMG_SIZE).to(DEVICE)
         self.fixed_noise = torch.randn(1, Z_DIM, 1, 1, device=DEVICE)
-        
         # Load the model
         self.load_model()
+
     def load_model(self):
         """Load the pre-trained model (full model only)"""
         # Path to full model file
         FULL_MODEL_PATH = os.path.join(DATA_DIR, 'gan_full_model.pth')
-        
         # Load only the full model - no fallbacks
         if os.path.exists(FULL_MODEL_PATH):
             try:
@@ -58,22 +58,19 @@ class MinimalGANGenerator:
             log("ERROR: Full model file (gan_full_model.pth) not found.")
             log(f"Expected at path: {FULL_MODEL_PATH}")
             raise FileNotFoundError("Full model file (gan_full_model.pth) not found.")
-    
+
     def generate_image(self):
         """Generate a single image from the model"""
         log("Generating image...")
         self.G.eval()  # Set to evaluation mode
-        
         with torch.no_grad():  # No need to track gradients
             # Generate the image
             fake = self.G(self.fixed_noise).detach().cpu()
-            
             # Save to a buffer instead of a file
             buffer = io.BytesIO()
             save_image(fake, buffer, format="PNG", normalize=True)
             buffer.seek(0)
             log("Image generated successfully")
-            
             return buffer.getvalue()
 
     def generate_grid(self, nrow=3, ncol=3):
@@ -105,19 +102,26 @@ def health_check():
 
 @app.route('/generate', methods=['GET'])
 def generate_image():
+    logs = []
     try:
-        log("Received request for image grid generation")
+        log("Received request for image grid generation", logs)
         img_bytes = generator.generate_grid(nrow=3, ncol=3)
         img_b64 = base64.b64encode(img_bytes).decode("utf-8")
+        log("Image generated and encoded successfully", logs)
         return jsonify({
             'image': img_b64,
-            'timestamp': str(time.time())
+            'timestamp': str(time.time()),
+            'logs': logs,
+            'model_type': 'GAN'  # Include the model type for frontend
         })
     except Exception as e:
-        log(f"Error generating image: {str(e)}")
+        error_msg = f"Error generating image: {str(e)}"
+        log(error_msg, logs)
         return jsonify({
-            'error': str(e),
-            'timestamp': str(time.time())
+            'error': error_msg,
+            'logs': logs,
+            'timestamp': str(time.time()),
+            'model_type': 'GAN'
         }), 500
 
 if __name__ == '__main__':
