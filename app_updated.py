@@ -64,28 +64,9 @@ class MinimalGANGenerator:
             log(f"Expected at path: {FULL_MODEL_PATH}", log_list)
             raise FileNotFoundError("Full model file (gan_full_model.pth) not found.")
     
-    def detect_overfitting(self):
-        # Placeholder: Replace with real overfitting detection logic
-        # For demonstration, always return False
-        return False
-
-    def increase_resolution(self, log_list=None):
-        # Double the image size, up to a reasonable max (e.g., 256)
-        new_size = min(self.img_size * 2, 256)
-        if new_size > self.img_size:
-            log(f"Increasing resolution from {self.img_size} to {new_size}", log_list)
-            self.img_size = new_size
-            from models.gan_modules import Generator
-            self.G = Generator(z_dim=self.z_dim, img_channels=3, img_size=self.img_size).to(self.device)
-            self.fixed_noise = torch.randn(1, self.z_dim, 1, 1, device=self.device)
-            self.load_model(log_list)
-        else:
-            log(f"Resolution already at maximum ({self.img_size})", log_list)
-
     def generate_image(self, log_list=None):
-        if self.detect_overfitting():
-            self.increase_resolution(log_list)
-        log(f"Generating image at resolution {self.img_size}x{self.img_size}...", log_list)
+        """Generate a single image from the model"""
+        log("Generating image...", log_list)
         self.G.eval()  # Set to evaluation mode
         
         with torch.no_grad():  # No need to track gradients
@@ -101,9 +82,8 @@ class MinimalGANGenerator:
             return buffer.getvalue()
 
     def generate_grid(self, nrow=3, ncol=3, log_list=None):
-        if self.detect_overfitting():
-            self.increase_resolution(log_list)
-        log(f"Generating {nrow*ncol} images for grid at resolution {self.img_size}x{self.img_size}...", log_list)
+        """Generate a single image that is a grid of generated images"""
+        log(f"Generating {nrow*ncol} images for grid...", log_list)
         self.G.eval()
         with torch.no_grad():
             noise = torch.randn(nrow * ncol, self.z_dim, 1, 1, device=self.device)
@@ -116,32 +96,6 @@ class MinimalGANGenerator:
             buffer.seek(0)
             log("Grid image generated successfully", log_list)
             return buffer.getvalue()
-
-    def save_checkpoint(self, log_list=None, suffix=None):
-        """Save a checkpoint of the current generator state."""
-        checkpoint_name = f"gan_checkpoint_{int(time.time())}{'_' + suffix if suffix else ''}.pth"
-        checkpoint_path = os.path.join(DATA_DIR, checkpoint_name)
-        try:
-            torch.save({'G': self.G.state_dict()}, checkpoint_path)
-            log(f"Checkpoint saved: {checkpoint_path}", log_list)
-        except Exception as e:
-            log(f"ERROR: Failed to save checkpoint: {str(e)}", log_list)
-
-    def combine_checkpoints(self, log_list=None):
-        """Combine all checkpoints into a single full model (simple last-one-wins merge)."""
-        checkpoints = [f for f in os.listdir(DATA_DIR) if f.startswith('gan_checkpoint_') and f.endswith('.pth')]
-        if not checkpoints:
-            log("No checkpoints found to combine.", log_list)
-            return
-        checkpoints.sort()  # Sort by timestamp in filename
-        last_checkpoint = checkpoints[-1]
-        last_checkpoint_path = os.path.join(DATA_DIR, last_checkpoint)
-        try:
-            checkpoint = torch.load(last_checkpoint_path, map_location=self.device)
-            torch.save({'G': checkpoint['G']}, os.path.join(DATA_DIR, 'gan_full_model.pth'))
-            log(f"Combined checkpoints into full model: gan_full_model.pth (using {last_checkpoint})", log_list)
-        except Exception as e:
-            log(f"ERROR: Failed to combine checkpoints: {str(e)}", log_list)
 
 # Initialize the generator once at startup
 generator = MinimalGANGenerator()
@@ -171,10 +125,6 @@ def generate_image():
     except Exception as e:
         error_msg = f"Error generating image: {str(e)}"
         log(error_msg, logs)
-        # Save checkpoint on error
-        generator.save_checkpoint(logs, suffix="error")
-        # Try to combine checkpoints into a full model
-        generator.combine_checkpoints(logs)
         return jsonify({
             'error': error_msg,
             'logs': logs,
