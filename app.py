@@ -111,6 +111,7 @@ class MinimalGANGenerator:
         """Generate a 4x4 grid of images, ensuring each fools D and is visually distinct from the others, and upscale to 720x720."""
         import torch.nn.functional as F
         from torchvision.transforms.functional import resize
+        from torchvision.transforms import InterpolationMode
         log(f"Generating {nrow*ncol} images for grid with D-fooling and distinctness check...")
         self.G.eval()
         self.D.eval()
@@ -152,7 +153,7 @@ class MinimalGANGenerator:
         from torchvision.utils import make_grid
         grid = make_grid(images_tensor, nrow=nrow, normalize=True, pad_value=1.0, padding=2)
         # Upscale to 720x720 using bilinear interpolation
-        grid = resize(grid, [720, 720], interpolation=F.InterpolationMode.BILINEAR, antialias=True)
+        grid = resize(grid, [720, 720], interpolation=InterpolationMode.BILINEAR, antialias=True)
         buffer = io.BytesIO()
         save_image(grid, buffer, format="PNG", normalize=True)
         buffer.seek(0)
@@ -175,7 +176,7 @@ def generate_image():
     logs = []
     try:
         log("Received request for image grid generation", logs)
-        img_bytes = generator.generate_grid(nrow=3, ncol=3)
+        img_bytes = generator.generate_grid(nrow=4, ncol=4)
         img_b64 = base64.b64encode(img_bytes).decode("utf-8")
         grid_id = f"grid-{int(time.time() * 1000)}"  # Unique grid id
         log("Image generated and encoded successfully", logs)
