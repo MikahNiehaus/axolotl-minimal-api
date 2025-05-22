@@ -107,9 +107,10 @@ class MinimalGANGenerator:
             log("Image generated successfully")
             return buffer.getvalue()
 
-    def generate_grid(self, nrow=3, ncol=3):
-        """Generate a grid of images, ensuring each fools D and is visually distinct from the others."""
+    def generate_grid(self, nrow=4, ncol=4):
+        """Generate a 4x4 grid of images, ensuring each fools D and is visually distinct from the others, and upscale to 720x720."""
         import torch.nn.functional as F
+        from torchvision.transforms.functional import resize
         log(f"Generating {nrow*ncol} images for grid with D-fooling and distinctness check...")
         self.G.eval()
         self.D.eval()
@@ -118,7 +119,7 @@ class MinimalGANGenerator:
         max_attempts = 40
         base_threshold = 0.15  # Lower = more strict, adjust as needed
         threshold = base_threshold * self.distinctness_scale
-        d_threshold = 1  # Only accept images that fool D by a large amount (D output > 0.9)
+        d_threshold = 0.9  # Only accept images that fool D by a large amount (D output > 0.9)
         for idx in range(nrow * ncol):
             attempt = 0
             while attempt < max_attempts:
@@ -150,10 +151,12 @@ class MinimalGANGenerator:
         images_tensor = torch.cat(images, dim=0)
         from torchvision.utils import make_grid
         grid = make_grid(images_tensor, nrow=nrow, normalize=True, pad_value=1.0, padding=2)
+        # Upscale to 720x720 using bilinear interpolation
+        grid = resize(grid, [720, 720], interpolation=F.InterpolationMode.BILINEAR, antialias=True)
         buffer = io.BytesIO()
         save_image(grid, buffer, format="PNG", normalize=True)
         buffer.seek(0)
-        log("Grid image generated successfully")
+        log("Grid image generated successfully (4x4, 720x720)")
         return buffer.getvalue()
 
 # Initialize the generator once at startup
