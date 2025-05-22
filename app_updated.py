@@ -44,25 +44,36 @@ class MinimalGANGenerator:
         self.load_model()
 
     def load_model(self, log_list=None):
-        """Load the pre-trained model (full model only)"""
-        # Path to full model file
-        FULL_MODEL_PATH = os.path.join(DATA_DIR, 'gan_full_model.pth')
-        
-        # Load only the full model - no fallbacks
-        if os.path.exists(FULL_MODEL_PATH):
-            try:
-                log(f"Loading full model from: {FULL_MODEL_PATH}", log_list)
-                checkpoint = torch.load(FULL_MODEL_PATH, map_location=self.device)
+        """Load the pre-trained generator model from any .pth file in data/"""
+        import glob
+        # Find any .pth file in the data directory
+        model_files = glob.glob(os.path.join(DATA_DIR, '*.pth'))
+        if not model_files:
+            log("ERROR: No model file found in data/ directory.", log_list)
+            raise FileNotFoundError("No model file found in data/ directory.")
+        model_path = model_files[0]
+        try:
+            log(f"Loading model from: {model_path}", log_list)
+            checkpoint = torch.load(model_path, map_location=self.device)
+            # Try to load only the generator part if possible
+            if isinstance(checkpoint, dict) and 'G' in checkpoint:
                 self.G.load_state_dict(checkpoint['G'])
-                log("Successfully loaded full model", log_list)
-                return
-            except Exception as e:
-                log(f"ERROR: Failed to load full model: {str(e)}", log_list)
-                raise RuntimeError(f"Could not load the full model: {str(e)}")
-        else:
-            log("ERROR: Full model file (gan_full_model.pth) not found.", log_list)
-            log(f"Expected at path: {FULL_MODEL_PATH}", log_list)
-            raise FileNotFoundError("Full model file (gan_full_model.pth) not found.")
+                log("Loaded generator weights from 'G' key in checkpoint.", log_list)
+            elif isinstance(checkpoint, dict) and 'generator' in checkpoint:
+                self.G.load_state_dict(checkpoint['generator'])
+                log("Loaded generator weights from 'generator' key in checkpoint.", log_list)
+            elif isinstance(checkpoint, dict):
+                # Try loading as if the dict is the state_dict
+                self.G.load_state_dict(checkpoint)
+                log("Loaded generator weights from checkpoint dict directly.", log_list)
+            else:
+                # Try loading as if the checkpoint is the state_dict
+                self.G.load_state_dict(checkpoint)
+                log("Loaded generator weights from checkpoint directly.", log_list)
+            log("Successfully loaded generator model", log_list)
+        except Exception as e:
+            log(f"ERROR: Failed to load generator model: {str(e)}", log_list)
+            raise RuntimeError(f"Could not load the generator model: {str(e)}")
     
     def generate_image(self, log_list=None):
         """Generate a single image from the model"""
