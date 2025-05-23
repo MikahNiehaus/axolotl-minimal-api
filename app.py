@@ -176,7 +176,7 @@ def generate_image():
     logs = []
     try:
         log("Received request for image grid generation", logs)
-        img_bytes = generator.generate_grid(nrow=4, ncol=4)
+        img_bytes = generator.generate_grid(nrow=2, ncol=2)
         img_b64 = base64.b64encode(img_bytes).decode("utf-8")
         grid_id = f"grid-{int(time.time() * 1000)}"  # Unique grid id
         log("Image generated and encoded successfully", logs)
